@@ -37,60 +37,43 @@ gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSour
 gl.linkProgram(program);
 gl.useProgram(program);
 
-const lineVertices = [];       // [x, y, r, g, b, ...]
-const triangleVertices = [];   // [x, y, r, g, b, ...]
+const triVBO = gl.createBuffer();
+const lineVBO = gl.createBuffer();
+const STRIDE = 5 * Float32Array.BYTES_PER_ELEMENT;
 
-function addLine(p1, p2, color = [0.0, 0.0, 0.0]) {
-    lineVertices.push(
-        p1[0], p1[1], color[0], color[1], color[2],
-        p2[0], p2[1], color[0], color[1], color[2]
-    );
+function drawGeometry(buffer, data, drawMode) {
+    if (data.length === 0) return;
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, STRIDE, 0);
+
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, STRIDE, 2 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.drawArrays(drawMode, 0, data.length / 5);
 }
 
-function addTriangle(p1, p2, p3, color = [0.85, 0.1, 0.1]) {
-    triangleVertices.push(
-        p1[0], p1[1], color[0], color[1], color[2],
-        p2[0], p2[1], color[0], color[1], color[2],
-        p3[0], p3[1], color[0], color[1], color[2]
-    );
-}
-
-// ==========================================
-// 1. CIRCUNFERENCIA PRINCIPAL
-// ==========================================
-const R = 0.60;                  // Radio de la circunferencia
+const R = 0.60;                       // Radio de la circunferencia
 const circleSegments = 240;
-
-for (let i = 0; i < circleSegments; i++) {
-    const a1 = (i / circleSegments) * Math.PI * 2;
-    const a2 = ((i + 1) / circleSegments) * Math.PI * 2;
-    addLine(
-        [Math.cos(a1) * R, Math.sin(a1) * R],
-        [Math.cos(a2) * R, Math.sin(a2) * R],
-        [0.0, 0.0, 0.0]
-    );
-}
-
-// ==========================================
-// 2. TRIÁNGULOS ISÓSCELES CON GIRO EN SU EJE
-// ==========================================
-const numTriangles = 24;          // Triángulos que completan la circunferencia
+const numTriangles = 24;              // Cantidad total de triángulos alrededor de la circunferencia
 const deltaAngle = (Math.PI * 2) / numTriangles;
 
-// Dimensiones del triángulo isósceles:
-// La base coincide exactamente con la longitud de la cuerda del arco correspondiente
+// Dimensiones exactas del triángulo isósceles para coincidir con la cuerda
 const baseChordLength = 2 * R * Math.sin(deltaAngle / 2);
 const halfBase = baseChordLength / 2;
-const triangleHeight = halfBase * 1.5; // Altura del isósceles
+const triangleHeight = halfBase * 1.5;
 
-// Baricentro / centro de rotación del triángulo
-const yCenter = triangleHeight / 3; 
+// Baricentro / centro de giro en su propio eje
+const yCenter = triangleHeight / 3;
 const localApex  = [0.0, triangleHeight - yCenter];
 const localBaseL = [-halfBase, -yCenter];
 const localBaseR = [ halfBase, -yCenter];
 
-// Sub-triángulo en la punta para el relleno rojo identificador
-const tipFraction = 0.40; // Porción de la punta pintada de rojo
+// Sub-triángulo rojo en la punta (ápice)
+const tipFraction = 0.40;
 const localTipL = [
     localApex[0] + (localBaseL[0] - localApex[0]) * tipFraction,
     localApex[1] + (localBaseL[1] - localApex[1]) * tipFraction
@@ -100,86 +83,105 @@ const localTipR = [
     localApex[1] + (localBaseR[1] - localApex[1]) * tipFraction
 ];
 
-// El segundo triángulo (i = 1) ahora rota el grado que antes correspondía al triángulo #8 (8 * 2π / 24 = 120°)
+// Paso de rotación relativa entre triángulos adyacentes: 120° (grado del triángulo #8)
 const spinStepPerTriangle = (8 * Math.PI * 2) / numTriangles;
 
-for (let i = 0; i < numTriangles; i++) {
-    // 1. Ángulo de posición orbital sobre la circunferencia (inicia arriba en PI/2 y avanza hacia la derecha)
-    const orbitAngle = Math.PI / 2 - (i * deltaAngle);
+// Velocidad del movimiento orbital (radianes por segundo)
+const orbitSpeed = 0.5;
 
-    // Centro posicionado sobre la circunferencia
-    const cx = Math.cos(orbitAngle) * (R + yCenter);
-    const cy = Math.sin(orbitAngle) * (R + yCenter);
+let startTime = performance.now();
 
-    // 2. Orientación tangencial base perpendicular al radio
-    const tangentAngle = orbitAngle - Math.PI / 2;
+function render() {
+    const elapsed = (performance.now() - startTime) / 1000;
+    
+    // Desplazamiento angular global en el tiempo
+    const timeOffset = elapsed * orbitSpeed;
 
-    // 3. Rotación en su propio eje:
-    // El triángulo 0 tiene 0° de rotación relativa.
-    // El triángulo 1 tiene exactamente la rotación del anterior triángulo #8 (120° a la derecha),
-    // y cada triángulo siguiente continúa sumando este mismo grado de rotación.
-    const spinAngle = -(i * spinStepPerTriangle);
-    const totalAngle = tangentAngle + spinAngle;
+    const lineVertices = [];
+    const triangleVertices = [];
 
-    const cosA = Math.cos(totalAngle);
-    const sinA = Math.sin(totalAngle);
+    function addLine(p1, p2, color = [0.0, 0.0, 0.0]) {
+        lineVertices.push(
+            p1[0], p1[1], color[0], color[1], color[2],
+            p2[0], p2[1], color[0], color[1], color[2]
+        );
+    }
 
-    // Transformación afín 2D (rotación propia + traslación a la órbita)
-    const transform = ([lx, ly]) => [
-        cx + (lx * cosA - ly * sinA),
-        cy + (lx * sinA + ly * cosA)
-    ];
+    function addTri(p1, p2, p3, color = [0.92, 0.12, 0.12]) {
+        triangleVertices.push(
+            p1[0], p1[1], color[0], color[1], color[2],
+            p2[0], p2[1], color[0], color[1], color[2],
+            p3[0], p3[1], color[0], color[1], color[2]
+        );
+    }
 
-    const apex  = transform(localApex);
-    const baseL = transform(localBaseL);
-    const baseR = transform(localBaseR);
+    // 1. Circunferencia base estática
+    for (let i = 0; i < circleSegments; i++) {
+        const a1 = (i / circleSegments) * Math.PI * 2;
+        const a2 = ((i + 1) / circleSegments) * Math.PI * 2;
+        addLine(
+            [Math.cos(a1) * R, Math.sin(a1) * R],
+            [Math.cos(a2) * R, Math.sin(a2) * R],
+            [0.0, 0.0, 0.0]
+        );
+    }
 
-    const tipL = transform(localTipL);
-    const tipR = transform(localTipR);
+    // 2. Triángulos en movimiento orbital y rotación intrínseca sobre su propio eje
+    for (let i = 0; i < numTriangles; i++) {
+        // Posición orbital que avanza en el tiempo hacia la derecha
+        const orbitAngle = Math.PI / 2 - (i * deltaAngle) - timeOffset;
 
-    // --- Relleno rojo en la punta para identificar claramente el giro ---
-    addTriangle(apex, tipL, tipR, [0.92, 0.12, 0.12]);
+        // Posición del centro del triángulo
+        const cx = Math.cos(orbitAngle) * (R + yCenter);
+        const cy = Math.sin(orbitAngle) * (R + yCenter);
 
-    // Línea divisoria y de detalle interno en la punta roja
-    const midTip = [(tipL[0] + tipR[0]) * 0.5, (tipL[1] + tipR[1]) * 0.5];
-    addLine(apex, midTip, [0.75, 0.05, 0.05]);
-    addLine(tipL, tipR,   [0.75, 0.05, 0.05]);
+        // Alineación tangencial con la circunferencia
+        const tangentAngle = orbitAngle - Math.PI / 2;
 
-    // --- Contorno negro del triángulo isósceles ---
-    addLine(apex, baseL, [0.0, 0.0, 0.0]);
-    addLine(baseL, baseR, [0.0, 0.0, 0.0]);
-    addLine(baseR, apex,  [0.0, 0.0, 0.0]);
+        // Rotación en su propio eje:
+        // - Cada triángulo tiene el salto de 120° (spinStepPerTriangle) respecto a su vecino.
+        // - Además, gira continuamente en su eje sincronizado con el avance temporal.
+        const spinAngle = -(i * spinStepPerTriangle) - (timeOffset * 8.0);
+        const totalAngle = tangentAngle + spinAngle;
+
+        const cosA = Math.cos(totalAngle);
+        const sinA = Math.sin(totalAngle);
+
+        const transform = ([lx, ly]) => [
+            cx + (lx * cosA - ly * sinA),
+            cy + (lx * sinA + ly * cosA)
+        ];
+
+        const apex  = transform(localApex);
+        const baseL = transform(localBaseL);
+        const baseR = transform(localBaseR);
+
+        const tipL = transform(localTipL);
+        const tipR = transform(localTipR);
+
+        // Relleno rojo identificador en la punta
+        addTri(apex, tipL, tipR, [0.92, 0.12, 0.12]);
+
+        // Nervadura interna en la punta
+        const midTip = [(tipL[0] + tipR[0]) * 0.5, (tipL[1] + tipR[1]) * 0.5];
+        addLine(apex, midTip, [0.75, 0.05, 0.05]);
+        addLine(tipL, tipR,   [0.75, 0.05, 0.05]);
+
+        // Contorno negro del triángulo isósceles
+        addLine(apex, baseL, [0.0, 0.0, 0.0]);
+        addLine(baseL, baseR, [0.0, 0.0, 0.0]);
+        addLine(baseR, apex,  [0.0, 0.0, 0.0]);
+    }
+
+    // 3. Dibujo en pantalla
+    gl.clearColor(1.0, 1.0, 1.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    drawGeometry(triVBO, triangleVertices, gl.TRIANGLES);
+    drawGeometry(lineVBO, lineVertices, gl.LINES);
+
+    requestAnimationFrame(render);
 }
 
-// ==========================================
-// 3. RENDERIZADO 
-// ==========================================
-function setupAndDraw(data, drawMode) {
-    if (data.length === 0) return;
-
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
-
-    const stride = 5 * Float32Array.BYTES_PER_ELEMENT;
-
-    // aPosition: vec2 (x, y)
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, stride, 0);
-
-    // aColor: vec3 (r, g, b)
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 2 * Float32Array.BYTES_PER_ELEMENT);
-
-    gl.drawArrays(drawMode, 0, data.length / 5);
-}
-
-// Fondo blanco 
-gl.clearColor(1.0, 1.0, 1.0, 1.0);
-gl.clear(gl.COLOR_BUFFER_BIT);
-
-// 1. Dibujar los interiores rojos en las puntas de los triángulos
-setupAndDraw(triangleVertices, gl.TRIANGLES);
-
-// 2. Dibujar las aristas negras de los triángulos y la circunferencia
-setupAndDraw(lineVertices, gl.LINES);
+// Iniciar bucle de animación
+requestAnimationFrame(render);
