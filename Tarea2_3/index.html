@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Cubo de Rubik</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #0c0d12;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: monospace;
+      color: #eeeeee;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      background: #08090d;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
+      border-radius: 8px;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    h2 {
+      margin: 0 0 8px 0;
+      color: #ffd700;
+      letter-spacing: 1.5px;
+    }
+    p {
+      margin: 0 0 12px 0;
+      font-size: 13px;
+      color: #8c97a8;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+</head>
+<body>
+  <h2>CUBO DE RUBIK</h2>
+  <p>Arrastra con el ratón para girar | Rueda para zoom</p>
+  <canvas id="glCanvas" width="800" height="750"></canvas>
+  <script src="main.js"></script>
+</body>
+</html>
