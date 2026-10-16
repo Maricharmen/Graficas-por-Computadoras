@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>ADA 2.5: Camino en un Objeto 3D</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #101216;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: monospace;
+      color: #eaeaea;
+      overflow: hidden;
+    }
+    #canvas-container {
+      position: relative;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      cursor: grab;
+      background: #090a0d;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    #ui-panel {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(16, 18, 24, 0.85);
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.6;
+      pointer-events: none;
+      border: 1px solid #2a2e3d;
+    }
+    .badge {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      vertical-align: middle;
+      border-radius: 2px;
+      margin-right: 5px;
+    }
+    .red { background: #e63946; }
+    .green { background: #2a9d8f; }
+    .gray { background: #6c757d; }
+    button {
+      margin-top: 12px;
+      padding: 8px 16px;
+      font-family: monospace;
+      font-size: 13px;
+      background: #2a9d8f;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #21867a;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="glCanvas" width="800" height="700"></canvas>
+    <div id="ui-panel">
+      <strong>ADA 2.5: Camino en un Objeto 3D</strong><br>
+      • <span class="badge red"></span> Inicio / Fin (Rojo)<br>
+      • <span class="badge green"></span> Camino calculado (Verde)<br>
+      • <span class="badge gray"></span> Malla base (>500 vértices)<br>
+      • <em>Arrastra con el ratón</em>
+    </div>
+  </div>
+  <button id="btnRecalcular">Elegir Otros Triángulos Aleatorios</button>
+
+  <script src="main.js"></script>
+</body>
+</html>
